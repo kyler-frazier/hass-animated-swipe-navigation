@@ -1,6 +1,6 @@
 {
   "name": "hass-animated-swipe-navigation",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Swipe between Home Assistant dashboard views, with a liquid bubble that follows your finger.",
   "license": "MIT",
