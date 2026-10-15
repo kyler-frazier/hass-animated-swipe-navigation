@@ -13,6 +13,11 @@ import {
 const Y = 600;
 
 test.describe("bubble and gestures", () => {
+  test("the bubble is prepared before the first swipe", async ({ page }) => {
+    await openView(page, "/test-default/one");
+    await expect.poll(() => bubbleState(page)).toBe("hidden");
+  });
+
   test("bubble shows the destination icon while dragging, then goes away", async ({ page }) => {
     await openView(page, "/test-default/one");
     const ts = await touchscreen(page);

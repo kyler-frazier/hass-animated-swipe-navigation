@@ -57,10 +57,12 @@ test.describe("navigation", () => {
     test(`does nothing on ${dashboard}`, async ({ page }) => {
       await openView(page, `/${dashboard}/one`);
       const ts = await touchscreen(page);
-      await swipeToNext(ts);
+      await ts.down([330, Y]);
+      await ts.drag([330, Y], [330 - FAR, Y]);
+      expect(await bubbleState(page)).not.toBe("shown");
+      await ts.up();
       await page.waitForTimeout(600);
       await expectView(page, "one");
-      expect(await bubbleState(page)).toBe("absent");
     });
   }
 

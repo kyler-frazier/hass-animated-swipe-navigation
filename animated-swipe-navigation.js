@@ -367,6 +367,7 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
         g.target.icon || (fingerRight ? "mdi:chevron-left" : "mdi:chevron-right"),
       );
       setArmed(false);
+      ui.box.style.opacity = "";
       ui.box.style.display = ui.icon.style.display = "";
     } else {
       bub = null;
@@ -488,6 +489,27 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
 
   const onEnd = (e) => once(e) && release();
   const onCancel = (e) => once(e) && release(true);
+
+  // Phones set up the goo filter's GPU work on its first paint, which made the first swipe
+  // after launch stutter. Paint the bubble once, invisibly, while the page is idle.
+  const warmUp = () => {
+    if (ui || reducedMotion?.matches) return;
+    ui = makeUi();
+    bub = { opt: DEFAULTS, armedAt: null, shownAt: -Infinity };
+    setArmed(false);
+    ui.box.style.display = ui.icon.style.display = "";
+    render(0.6, -1, window.innerHeight / 2);
+    ui.box.style.opacity = ui.icon.style.opacity = "0.01"; // 0 would skip painting
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        if (g) return; // a swipe already took over the bubble
+        bub = null;
+        hide();
+      }),
+    );
+  };
+  if (window.requestIdleCallback) requestIdleCallback(warmUp, { timeout: 3000 });
+  else setTimeout(warmUp, 1000);
 
   window.addEventListener("touchstart", onStart, { passive: true, capture: true });
   window.addEventListener("touchmove", onMove, { passive: false, capture: true });

@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+
+- Stutter on the first swipe after the app or page loads.
+
 ## [0.1.0] - 2026-10-15
 
 ### Added
