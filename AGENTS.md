@@ -66,7 +66,9 @@ test. The suite drives real touch events through the Chrome DevTools Protocol
 ## Conventions
 
 - Prettier formatting (100 columns), ESLint recommended rules.
-- Comments explain _why_, not what. Match the existing density.
+- Keep comments concise. A comment should explain why the code is written the way it is, not
+  repeat what the code does (unless that's unobvious). If code doesn't need a comment, don't
+  write one.
 - [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, ...).
 - Update `CHANGELOG.md` under _Unreleased_ for user-visible changes.
 - Don't add dependencies to the plugin. Dev dependencies need a good reason.

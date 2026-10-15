@@ -8,6 +8,22 @@ Please use the [bug report form](https://github.com/kyler-frazier/hass-animated-
 and include your Home Assistant version, device and browser or app, and the relevant part of your
 dashboard configuration. A screen recording helps a lot for gesture issues.
 
+## Using AI tools
+
+AI tools are welcome here: this project itself is written with AI assistance. What matters is
+that a person stands behind every contribution.
+
+- **Disclose it.** If AI helped with a pull request, say which tool and roughly how much in the
+  pull request description.
+- **Understand it.** You should be able to explain every change you submit and how it fits the
+  rest of the plugin without the AI's help.
+- **Verify it.** Run the tests, and try gesture changes on a real touch device. For bug reports,
+  reproduce the problem yourself.
+- **Edit it.** AI-written issues and descriptions tend to be long and padded. Trim them to what a
+  maintainer needs to know.
+
+Contributions that don't meet this bar may be closed without detailed review.
+
 ## Development setup
 
 Requirements: Node.js 22+ and Docker.

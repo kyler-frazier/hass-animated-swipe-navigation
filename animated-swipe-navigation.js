@@ -1,23 +1,12 @@
 /**
- * Animated Swipe Navigation for Home Assistant
+ * Animated Swipe Navigation for Home Assistant (MIT)
  * https://github.com/kyler-frazier/hass-animated-swipe-navigation
- *
- * Swipe between dashboard views on touch screens. While a finger drags sideways,
- * a liquid bubble is pulled out of the screen edge (showing the destination
- * view's icon) and the current view shifts and fades slightly. Once the swipe is
- * far enough to navigate, the bubble's neck pinches off and it bounces free;
- * dragging back (or releasing early) lets it re-merge with the wall.
- *
- * Enable it per dashboard with an `animated_swipe_nav:` block in the dashboard's
- * raw configuration (see README).
- *
- * MIT License
  */
 
 const VERSION = "0.0.0-dev"; // replaced by the release workflow
 
 (() => {
-  if (window.__animatedSwipeNavigation) return; // loaded twice (e.g. two resources)
+  if (window.__animatedSwipeNavigation) return; // e.g. added as a resource twice
   window.__animatedSwipeNavigation = VERSION;
 
   console.info(
@@ -26,43 +15,41 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
     "color: #03a9f4; background: #fff; font-weight: 700;",
   );
 
-  /** Dashboard config key and its defaults. */
   const CONFIG_KEY = "animated_swipe_nav";
   const DEFAULTS = {
     enable: true,
-    wrap: true, // swiping past the last view goes to the first (and vice versa)
-    swipe_amount: 15, // % of the screen width a swipe must travel to navigate
-    skip_hidden: true, // skip views hidden from the current user
+    wrap: true,
+    swipe_amount: 15, // % of screen width
+    skip_hidden: true,
     skip_subviews: true,
-    skip_tabs: [], // 0-based view indexes to never land on
-    liquid: true, // wall "water" the bubble is pulled out of
-    haptics: true, // short vibration when the swipe will navigate (Android)
+    skip_tabs: [],
+    liquid: true,
+    haptics: true,
     bubble_color: "#34373e",
     bubble_active_color: "color-mix(in srgb, var(--primary-color, #03a9f4) 78%, #000)",
     icon_color: "#b4b7bf",
     icon_active_color: "rgba(255, 255, 255, .85)",
   };
 
-  // Look and feel (not user-configurable yet)
-  const MAX_SHIFT = 28; // px the view follows the finger
+  const MAX_SHIFT = 28; // px
   const MAX_FADE = 0.2; // opacity lost at full pull
-  const Y_FOLLOW = 0.25; // bubble follows 25% of the finger's vertical movement
+  const Y_FOLLOW = 0.25; // share of the finger's vertical movement the bubble follows
   const R = 28; // ball radius
-  const GAP = 14; // ball's distance from the wall once detached
+  const GAP = 14; // ball's distance from the wall once out
   const BOX_W = 200,
     BOX_H = 340,
     WALL = 40; // goo canvas; wall sits WALL px inside it
   const MOUND_H = [120, 45]; // wall mound half-height: at rest -> once the ball is out
   const MOUND_W = [30, 8]; // mound protrusion: peak -> at the threshold (thin neck)
-  const SNAP_MS = 130; // neck pinching off once the threshold is reached
-  const STRETCH = [1.2, 0.84]; // ball scale x/y at full tension, just before it snaps
-  const BOUNCE_MS = 440; // longest bounce/jiggle animation
-  const FLICK_MS = 50; // water waits this long; a swipe that snaps sooner never shows it
-  const WATER_LAG_MS = 50; // water starts out lagging the ball's pull by this (time constant)
-  const CATCHUP_MS = 50; // ...and the lag shrinks to 0 over this long, then it's locked on
-  const DECIDE_PX = 10; // movement before a touch is classified as horizontal/vertical
+  const SNAP_MS = 130; // neck pinch-off duration
+  const STRETCH = [1.2, 0.84]; // ball scale x/y at full tension
+  const BOUNCE_MS = 440;
+  const FLICK_MS = 50; // swipes that snap sooner never show water
+  const WATER_LAG_MS = 50; // time constant
+  const CATCHUP_MS = 50; // lag shrinks to 0 over this
+  const DECIDE_PX = 10; // movement before a touch counts as horizontal or vertical
 
-  // Touches starting on these never swipe (sliders, horizontal scrollers, maps...)
+  // Controls that need horizontal drags themselves
   const SKIP = [
     "ha-slider",
     "ha-control-slider",
@@ -85,16 +72,13 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
   const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
 
   let g = null; // current gesture
-  let ui = null; // { box, strip, bump, ball, icon }
+  let ui = null;
   let anim = 0; // rAF id of the release animation
-  let popId = 0; // bumps when a new bubble starts, so a stale pop can't hide it
-  // The bubble's own state. Outlives the gesture so its animations can finish
-  // after release: { p, s, by, opt, armedAt (null until it snapped off), ... }
+  let popId = 0; // lets a new bubble invalidate a stale fade-out
+  // Bubble state, kept separate from the gesture so animations can finish after release
   let bub = null;
 
   const clamp01 = (v) => Math.min(Math.max(v, 0), 1);
-
-  // ---------------------------------------------------------------- HA lookups
 
   const findPanel = (path) =>
     path.find((el) => el.tagName === "HA-PANEL-LOVELACE") ||
@@ -108,7 +92,7 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
 
   const options = (panel) => {
     const raw = panel?.lovelace?.config?.[CONFIG_KEY];
-    if (!raw || typeof raw !== "object") return null; // not enabled on this dashboard
+    if (!raw || typeof raw !== "object") return null;
     const opt = { ...DEFAULTS, ...raw };
     return opt.enable === false ? null : opt;
   };
@@ -116,7 +100,7 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
   const isRtl = () =>
     getComputedStyle(document.querySelector("home-assistant") || document.body).direction === "rtl";
 
-  // View a swipe would land on, or null when there's nowhere to go
+  // Null when there's nowhere to go
   const targetView = (panel, opt, backwards) => {
     const views = panel.lovelace?.config?.views;
     const cur = (panel.route?.path || "").replace("/", "");
@@ -141,8 +125,6 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
       return { ...v, path: v.path || String(i) };
     }
   };
-
-  // ------------------------------------------------------------------ bubble
 
   const makeUi = () => {
     // Gooey filter: blur + alpha threshold makes nearby shapes melt together
@@ -174,10 +156,8 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
     return { box, strip, bump, ball, icon };
   };
 
-  // Wall water has its own pull value. It's held back for FLICK_MS after the bubble
-  // appears (a flick that snaps within that never shows water), then starts from rest
-  // (widest, flattest mound) and chases the ball's pull with a lag that shrinks to 0
-  // over CATCHUP_MS, after which it's locked on. Returns null while hidden.
+  // The water starts from rest and catches up with the ball, so it never pops in fully
+  // formed. Null while it's held back.
   const waterP = (p) => {
     if (!bub || bub.noWall || !bub.opt.liquid) return null;
     const now = performance.now();
@@ -198,14 +178,11 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
   const render = (p, s, by, snap = 0) => {
     const { box, strip, bump, ball, icon } = ui;
     const boxLeft = s > 0 ? -WALL : window.innerWidth - BOX_W + WALL;
-    const wallX = s > 0 ? WALL : BOX_W - WALL; // wall position inside the box
+    const wallX = s > 0 ? WALL : BOX_W - WALL;
     box.style.translate = `${boxLeft}px ${by - BOX_H / 2}px`;
     strip.style.left = s > 0 ? "0" : `${BOX_W - WALL + 8}px`;
-    // Ball travels from inside the wall to GAP px out
     const cx = -R + (2 * R + GAP) * p;
-    // Wall mound: rises and narrows as the ball comes out, then thins to a neck
-    // that stays attached until the threshold. Crossing it pinches the neck off
-    // (snap), which is what sets off the bounce.
+    // The neck stays attached until the threshold, so the snap is what sets off the bounce
     const [aMax, aEnd] = MOUND_W;
     const w = waterP(p);
     const wv = w ?? 0;
@@ -216,8 +193,7 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
     bump.style.height = `${2 * b}px`;
     bump.style.translate = `${wallX - a}px ${BOX_H / 2 - b}px`;
     ball.style.translate = `${wallX + s * cx - R}px ${BOX_H / 2 - R}px`;
-    // Tension: the neck holds the ball back, so it stretches along the pull as it
-    // nears the threshold. Released (snap), it springs back via the bounce.
+    // The neck holds the ball back, so it stretches near the threshold
     const t = snap > 0 || bub?.armedAt != null ? 0 : clamp01((p - 0.55) / 0.45) ** 2;
     const sx = 1 + (STRETCH[0] - 1) * t;
     const sy = 1 + (STRETCH[1] - 1) * t;
@@ -227,7 +203,6 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
     const iconScale = 0.5 + 0.5 * clamp01((p - 0.3) / 0.6);
     icon.style.opacity = String(clamp01((p - 0.35) / 0.4));
     icon.style.translate = `${boxLeft + wallX + s * cx - 13}px ${by - 13}px`;
-    // Icon takes half of the ball's stretch
     icon.style.transform = `scale(${iconScale * (1 + (sx - 1) / 2)}, ${iconScale * (1 + (sy - 1) / 2)})`;
   };
 
@@ -239,8 +214,7 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
     ui.icon.style.color = armed ? bub.opt.icon_active_color : bub.opt.icon_color;
   };
 
-  // Squash & stretch on the x/y axes only, starting from the stretched shape the
-  // pull left them in: the ball recoils as it snaps free, the icon wobbles inside it
+  // Starts from the stretched shape the pull left, so the snap looks continuous
   const bounce = () => {
     const [x, y] = STRETCH;
     ui.ball.animate(
@@ -294,10 +268,7 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
     if (snap < 1) requestAnimationFrame(() => snapTick(me));
   };
 
-  // -------------------------------------------------------------- navigation
-
-  // Switch view right away (so a quick follow-up swipe starts from the right page),
-  // then slide the new view in from the side it's coming from
+  // Navigate right away so a quick follow-up swipe starts from the new view
   const navigate = (panel, target, s, old) => {
     const dash = location.pathname.split("/")[1];
     history.pushState(null, "", `/${dash}/${target.path}${location.search}${location.hash}`);
@@ -322,8 +293,6 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
     };
     requestAnimationFrame(slideIn);
   };
-
-  // ---------------------------------------------------------------- gesture
 
   // cancel: gesture aborted by the system, so no navigation happens
   const release = (cancel = false) => {
@@ -351,8 +320,7 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
       return;
     }
     if (going) {
-      // Fade the bubble out without cutting anything short: the neck keeps draining
-      // into the wall (snapTick runs on) and the fade ends just after the jiggle
+      // End the fade after the jiggle; snapTick keeps draining the neck meanwhile
       const left =
         bub.armedAt != null ? Math.max(0, bub.armedAt + BOUNCE_MS - performance.now()) : 0;
       const o = {
@@ -370,7 +338,6 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
       };
       return;
     }
-    // Not far enough: ease the pull back to 0 so the ball re-merges with the wall
     const t0 = performance.now();
     const step = (now) => {
       const k = clamp01((now - t0) / 260);
@@ -462,7 +429,6 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
         return;
       }
       if (Math.abs(dy) >= Math.abs(dx)) {
-        // Vertical: leave it to the browser to scroll
         g.unlisten?.();
         g = null;
         return;
@@ -472,13 +438,12 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
       if (g.view?.parentElement) g.view.parentElement.style.overflowX = "clip";
       setDirection(dx > 0);
     } else if (dx !== 0 && dx > 0 !== g.fingerRight) {
-      // Finger crossed back over its starting point: follow the new direction and
-      // move the bubble to the other wall (it's empty at this point)
+      // Navigation follows the final direction, so the bubble has to as well
       setDirection(dx > 0);
     }
     if (e.cancelable) e.preventDefault(); // no vertical scrolling during a horizontal drag
 
-    const along = Math.max(0, dx * g.s); // distance pulled in the committed direction
+    const along = Math.max(0, dx * g.s);
     const p = Math.min(along / ((screen.width * g.opt.swipe_amount) / 100), 1);
     g.p = p;
 
@@ -491,10 +456,9 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
     }
     if (!g.target) return;
 
-    // One bubble-diameter above the finger (so it isn't hidden under it), kept at
-    // least two diameters from the top and bottom of the screen
+    // Above the finger so it isn't hidden under it
     const fy = g.y - 2 * R + Y_FOLLOW * (t.clientY - g.y);
-    const margin = 5 * R; // 2 diameters + radius, as a limit for the center
+    const margin = 5 * R;
     g.by = Math.min(Math.max(fy, margin), window.innerHeight - margin);
     // Small hysteresis so the neck doesn't flicker on/off right at the threshold
     const armed = g.armed ? p >= 0.97 : p >= 1;
@@ -529,9 +493,8 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
   window.addEventListener("touchmove", onMove, { passive: false, capture: true });
   window.addEventListener("touchend", onEnd, { passive: true, capture: true });
   window.addEventListener("touchcancel", onCancel, { passive: true, capture: true });
-  // Backup for a missed lift: pointer events are re-targeted to whatever is under the
-  // finger when the original element disappears, so these still reach window.
-  // (Not pointercancel: the browser fires it when it starts its own pan, while the
-  // touch is still going and still ours to track.)
+  // Backup for a missed lift: unlike touch events, pointer events get re-targeted when
+  // the touched element disappears. Not pointercancel: the browser fires it when it
+  // starts its own pan, while the touch is still ours to track.
   window.addEventListener("pointerup", (e) => e.isPrimary && release(), { capture: true });
 })();

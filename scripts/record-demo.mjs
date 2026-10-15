@@ -23,25 +23,14 @@ const context = await browser.newContext({
   storageState: JSON.parse(await readFile("test-results/.auth.json", "utf8")),
 });
 const page = await context.newPage();
-if (process.env.DEBUG) {
-  page.on("framenavigated", (f) => f === page.mainFrame() && console.log("navigated:", f.url()));
-  page.on("console", (m) => console.log("console:", m.type(), m.text().slice(0, 200)));
-  page.on("crash", () => console.log("PAGE CRASHED"));
-  page.on("load", () => console.log("load event"));
-}
 await page.goto(`${base}/demo-home/home`);
 await page.waitForFunction(() => window.__animatedSwipeNavigation);
 await page.waitForTimeout(3000);
 
-// Freeze time: fake the clocks, and step every Web Animation by hand
+// Freeze time and step every Web Animation by hand
 await page.evaluate(() => {
-  // Keep the wall clock in step too: if Date.now() runs far ahead of
-  // performance.now(), Home Assistant assumes the device slept and reloads
-  const perf0 = performance.now();
-  const date0 = Date.now();
-  window.__now = perf0;
+  window.__now = performance.now();
   performance.now = () => window.__now;
-  Date.now = () => date0 + (window.__now - perf0);
   const starts = new WeakMap();
   window.__step = (ms) => {
     window.__now += ms;
