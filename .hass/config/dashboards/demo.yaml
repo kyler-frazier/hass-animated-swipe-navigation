@@ -1,0 +1,58 @@
+animated_swipe_nav: {}
+views:
+  - title: Home
+    path: home
+    icon: mdi:home
+    type: sections
+    sections:
+      - type: grid
+        title: Favorites
+        cards:
+          - type: tile
+            entity: input_boolean.living_room_lamp
+          - type: tile
+            entity: input_boolean.kitchen_light
+          - type: tile
+            entity: input_boolean.desk_light
+          - type: tile
+            entity: input_boolean.front_door
+          - type: tile
+            entity: input_boolean.tv
+          - type: tile
+            entity: input_boolean.fan
+  - title: Lights
+    path: lights
+    icon: mdi:lightbulb-group
+    type: sections
+    sections:
+      - type: grid
+        title: Lights
+        cards:
+          - type: tile
+            entity: input_boolean.living_room_lamp
+          - type: tile
+            entity: input_boolean.ceiling_light
+          - type: tile
+            entity: input_boolean.kitchen_light
+          - type: tile
+            entity: input_boolean.porch_light
+          - type: tile
+            entity: input_boolean.bedroom_lamp
+          - type: tile
+            entity: input_boolean.desk_light
+  - title: Climate
+    path: climate
+    icon: mdi:thermometer
+    type: sections
+    sections:
+      - type: grid
+        title: Climate
+        cards:
+          - type: tile
+            entity: input_boolean.heater
+          - type: tile
+            entity: input_boolean.fan
+          - type: tile
+            entity: input_boolean.humidifier
+          - type: tile
+            entity: input_boolean.purifier

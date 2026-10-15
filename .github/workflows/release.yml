@@ -1,0 +1,24 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  attach:
+    name: Attach plugin to release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stamp version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          sed -i "s/^const VERSION = \".*\";/const VERSION = \"${version}\";/" animated-swipe-navigation.js
+          grep -q "const VERSION = \"${version}\";" animated-swipe-navigation.js
+      - name: Upload asset
+        run: gh release upload "$GITHUB_REF_NAME" animated-swipe-navigation.js --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}

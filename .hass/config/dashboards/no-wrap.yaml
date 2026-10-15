@@ -1,0 +1,94 @@
+animated_swipe_nav:
+  wrap: false
+views:
+  - title: One
+    path: one
+    icon: mdi:numeric-1-circle
+    cards:
+      - type: markdown
+        content: "# View one"
+      - type: entities
+        entities:
+          - entity: input_number.test_slider
+  - title: Two
+    path: two
+    icon: mdi:numeric-2-circle
+    cards:
+      - type: markdown
+        content: "# View two"
+  - title: Three
+    path: three
+    icon: mdi:numeric-3-circle
+    cards:
+      - type: markdown
+        content: "# View three"
+  - title: Long
+    path: long
+    icon: mdi:format-list-bulleted
+    cards:
+      - type: markdown
+        content: "Filler card 1"
+      - type: markdown
+        content: "Filler card 2"
+      - type: markdown
+        content: "Filler card 3"
+      - type: markdown
+        content: "Filler card 4"
+      - type: markdown
+        content: "Filler card 5"
+      - type: markdown
+        content: "Filler card 6"
+      - type: markdown
+        content: "Filler card 7"
+      - type: markdown
+        content: "Filler card 8"
+      - type: markdown
+        content: "Filler card 9"
+      - type: markdown
+        content: "Filler card 10"
+      - type: markdown
+        content: "Filler card 11"
+      - type: markdown
+        content: "Filler card 12"
+      - type: markdown
+        content: "Filler card 13"
+      - type: markdown
+        content: "Filler card 14"
+      - type: markdown
+        content: "Filler card 15"
+      - type: markdown
+        content: "Filler card 16"
+      - type: markdown
+        content: "Filler card 17"
+      - type: markdown
+        content: "Filler card 18"
+      - type: markdown
+        content: "Filler card 19"
+      - type: markdown
+        content: "Filler card 20"
+      - type: markdown
+        content: "Filler card 21"
+      - type: markdown
+        content: "Filler card 22"
+      - type: markdown
+        content: "Filler card 23"
+      - type: markdown
+        content: "Filler card 24"
+      - type: markdown
+        content: "Filler card 25"
+      - type: markdown
+        content: "Filler card 26"
+      - type: markdown
+        content: "Filler card 27"
+      - type: markdown
+        content: "Filler card 28"
+      - type: markdown
+        content: "Filler card 29"
+      - type: markdown
+        content: "Filler card 30"
+  - title: Subview
+    path: sub
+    subview: true
+    cards:
+      - type: markdown
+        content: "# Subview"

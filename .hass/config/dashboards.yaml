@@ -1,0 +1,27 @@
+# One dashboard per scenario under test (see tests/)
+mode: storage
+dashboards:
+  test-default:
+    mode: yaml
+    title: Default options
+    filename: dashboards/default.yaml
+  test-no-wrap:
+    mode: yaml
+    title: No wrap
+    filename: dashboards/no-wrap.yaml
+  test-skip:
+    mode: yaml
+    title: Skipping views
+    filename: dashboards/skip.yaml
+  test-disabled:
+    mode: yaml
+    title: Disabled
+    filename: dashboards/disabled.yaml
+  test-no-config:
+    mode: yaml
+    title: Not configured
+    filename: dashboards/no-config.yaml
+  demo-home:
+    mode: yaml
+    title: Demo
+    filename: dashboards/demo.yaml

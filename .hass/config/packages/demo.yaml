@@ -1,0 +1,14 @@
+# Stand-in devices for the demo dashboard (used for the README recording)
+input_boolean:
+  living_room_lamp: { name: Living room lamp, icon: mdi:floor-lamp, initial: true }
+  ceiling_light: { name: Ceiling light, icon: mdi:ceiling-light, initial: false }
+  kitchen_light: { name: Kitchen light, icon: mdi:light-recessed, initial: true }
+  porch_light: { name: Porch light, icon: mdi:outdoor-lamp, initial: false }
+  bedroom_lamp: { name: Bedroom lamp, icon: mdi:lamp, initial: false }
+  desk_light: { name: Desk light, icon: mdi:desk-lamp, initial: true }
+  heater: { name: Heater, icon: mdi:radiator, initial: false }
+  fan: { name: Fan, icon: mdi:fan, initial: true }
+  humidifier: { name: Humidifier, icon: mdi:air-humidifier, initial: false }
+  purifier: { name: Air purifier, icon: mdi:air-purifier, initial: true }
+  front_door: { name: Front door, icon: mdi:door, initial: false }
+  tv: { name: TV, icon: mdi:television, initial: false }

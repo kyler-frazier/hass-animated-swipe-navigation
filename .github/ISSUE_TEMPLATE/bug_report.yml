@@ -1,0 +1,42 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Dashboard configuration
+      description: Your `animated_swipe_nav` block, and the cards involved if relevant.
+      render: yaml
+  - type: input
+    id: version
+    attributes:
+      label: Plugin version
+      description: Shown in the browser console when the dashboard loads.
+    validations:
+      required: true
+  - type: input
+    id: hass
+    attributes:
+      label: Home Assistant version
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and app or browser
+      placeholder: e.g. Pixel 8, Home Assistant Companion app 2026.10
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screen recordings and browser console errors help a lot.

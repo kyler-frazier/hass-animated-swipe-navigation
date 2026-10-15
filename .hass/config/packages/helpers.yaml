@@ -1,0 +1,7 @@
+# Entities used by the test dashboards
+input_number:
+  test_slider:
+    name: Test slider
+    min: 0
+    max: 100
+    mode: slider
