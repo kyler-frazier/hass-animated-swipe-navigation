@@ -63,20 +63,23 @@ bubble shows the destination view's icon (or an arrow if it has none).
 
 All options are optional.
 
-| Option                | Default                    | Description                                                                       |
-| --------------------- | -------------------------- | --------------------------------------------------------------------------------- |
-| `enable`              | `true`                     | Turn swiping off without removing the block.                                      |
-| `wrap`                | `true`                     | Swiping past the last view goes to the first, and vice versa.                     |
-| `swipe_amount`        | `15`                       | How far a swipe has to travel to switch views, in % of the screen width.          |
-| `skip_tabs`           | `[]`                       | View indexes (starting at 0) that swiping never lands on.                         |
-| `skip_subviews`       | `true`                     | Skip subviews.                                                                    |
-| `skip_hidden`         | `true`                     | Skip views hidden from the current user.                                          |
-| `liquid`              | `true`                     | Show the "water" the bubble is pulled out of. `false` shows just the bubble.      |
-| `haptics`             | `true`                     | Short vibration when the swipe will switch views (where supported, e.g. Android). |
-| `bubble_color`        | `#34373e`                  | Bubble color while dragging.                                                      |
-| `bubble_active_color` | darkened `--primary-color` | Bubble color once letting go will switch views. Any CSS color.                    |
-| `icon_color`          | `#b4b7bf`                  | Icon color while dragging.                                                        |
-| `icon_active_color`   | `rgba(255, 255, 255, .85)` | Icon color once letting go will switch views.                                     |
+| Option                | Default                    | Description                                                                                 |
+| --------------------- | -------------------------- | ------------------------------------------------------------------------------------------- |
+| `enable`              | `true`                     | Turn swiping off without removing the block.                                                |
+| `wrap`                | `true`                     | Swiping past the last view goes to the first, and vice versa.                               |
+| `swipe_amount`        | `15`                       | How far a swipe has to travel to switch views, in % of the screen width.                    |
+| `skip_tabs`           | `[]`                       | View indexes (starting at 0) that swiping never lands on.                                   |
+| `skip_subviews`       | `true`                     | Skip subviews.                                                                              |
+| `skip_hidden`         | `true`                     | Skip views hidden from the current user.                                                    |
+| `liquid`              | `true`                     | Show the "water" the bubble is pulled out of. `false` shows just the bubble.                |
+| `haptics`             | `true`                     | Short vibration when the swipe will switch views (where supported, e.g. Android).           |
+| `opacity`             | `0.75`                     | Opacity of the whole bubble, from 0 to 1.                                                   |
+| `bubble_color`        | `#272a2f`                  | Bubble color while dragging.                                                                |
+| `bubble_active_color` | `#383b42`                  | Bubble color once letting go will switch views. Any CSS color, e.g. `var(--primary-color)`. |
+| `icon_color`          | `#b4b7bf`                  | Icon color while dragging.                                                                  |
+| `icon_active_color`   | `rgba(255, 255, 255, .85)` | Icon color once letting go will switch views.                                               |
+| `shadow_color`        | `rgba(0, 0, 0, .35)`       | Color of the shadow under the bubble.                                                       |
+| `view_fade`           | `0.2`                      | How much the current view fades at full pull, from 0 (none) to 1.                           |
 
 Example:
 

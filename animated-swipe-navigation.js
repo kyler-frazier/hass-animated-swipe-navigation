@@ -25,14 +25,16 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
     skip_tabs: [],
     liquid: true,
     haptics: true,
-    bubble_color: "#34373e",
-    bubble_active_color: "color-mix(in srgb, var(--primary-color, #03a9f4) 78%, #000)",
+    opacity: 0.75,
+    bubble_color: "#272a2f",
+    bubble_active_color: "#383b42",
     icon_color: "#b4b7bf",
     icon_active_color: "rgba(255, 255, 255, .85)",
+    shadow_color: "rgba(0, 0, 0, .35)",
+    view_fade: 0.2, // opacity the view loses at full pull
   };
 
   const MAX_SHIFT = 28; // px
-  const MAX_FADE = 0.2; // opacity lost at full pull
   const Y_FOLLOW = 0.25; // share of the finger's vertical movement the bubble follows
   const R = 28; // ball radius
   const GAP = 14; // ball's distance from the wall once out
@@ -137,7 +139,7 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
     const box = document.createElement("div");
     box.className = "asn-bubble";
     box.style.cssText = `position:fixed;z-index:9;top:0;left:0;width:${BOX_W}px;height:${BOX_H}px;
-      pointer-events:none;filter:url(#asn-goo) drop-shadow(0 2px 5px rgba(0,0,0,.35));display:none`;
+      pointer-events:none;display:none`;
     const shape = "position:absolute;left:0;top:0;border-radius:50%;transition:background .15s;";
     const bump = document.createElement("div");
     const ball = document.createElement("div");
@@ -201,9 +203,14 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
     // Icon lives outside the filter so it stays crisp. Positions use the `translate`
     // property so the bounce's scale animations apply around each element's center.
     const iconScale = 0.5 + 0.5 * clamp01((p - 0.3) / 0.6);
-    icon.style.opacity = String(clamp01((p - 0.35) / 0.4));
+    icon.style.opacity = String(clamp01((p - 0.35) / 0.4) * (bub?.opt.opacity ?? 1));
     icon.style.translate = `${boxLeft + wallX + s * cx - 13}px ${by - 13}px`;
     icon.style.transform = `scale(${iconScale * (1 + (sx - 1) / 2)}, ${iconScale * (1 + (sy - 1) / 2)})`;
+  };
+
+  const applyOptions = (opt) => {
+    ui.box.style.filter = `url(#asn-goo) drop-shadow(0 2px 5px ${opt.shadow_color})`;
+    ui.box.style.opacity = String(opt.opacity);
   };
 
   const setArmed = (armed) => {
@@ -330,8 +337,8 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
         fill: "forwards",
       };
       const id = ++popId;
-      ui.box.animate([{ opacity: 1 }, { opacity: 0 }], o);
-      ui.icon.animate([{ opacity: 1 }, { opacity: 0 }], o).onfinish = () => {
+      ui.box.animate([{ opacity: 0 }], o); // from whatever opacity it's at
+      ui.icon.animate([{ opacity: 0 }], o).onfinish = () => {
         if (id !== popId) return; // a newer bubble took over
         stopAnimations();
         hide();
@@ -367,7 +374,7 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
         g.target.icon || (fingerRight ? "mdi:chevron-left" : "mdi:chevron-right"),
       );
       setArmed(false);
-      ui.box.style.opacity = "";
+      applyOptions(g.opt);
       ui.box.style.display = ui.icon.style.display = "";
     } else {
       bub = null;
@@ -453,7 +460,7 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
       const shift = g.target ? MAX_SHIFT * p : Math.min(along * 0.05, 8);
       g.view.style.transition = "";
       g.view.style.transform = `translateX(${g.s * shift}px)`;
-      g.view.style.opacity = g.target ? String(1 - MAX_FADE * p) : "";
+      g.view.style.opacity = g.target ? String(1 - g.opt.view_fade * p) : "";
     }
     if (!g.target) return;
 
@@ -496,6 +503,7 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
     if (ui || reducedMotion?.matches) return;
     ui = makeUi();
     bub = { opt: DEFAULTS, armedAt: null, shownAt: -Infinity };
+    applyOptions(DEFAULTS);
     setArmed(false);
     ui.box.style.display = ui.icon.style.display = "";
     render(0.6, -1, window.innerHeight / 2);

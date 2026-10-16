@@ -1,0 +1,21 @@
+animated_swipe_nav:
+  opacity: 0.5
+  bubble_color: rgb(10, 20, 30)
+  bubble_active_color: rgb(40, 50, 60)
+  icon_color: rgb(70, 80, 90)
+  icon_active_color: rgb(100, 110, 120)
+  shadow_color: rgb(130, 140, 150)
+  view_fade: 0.5
+views:
+  - title: One
+    path: one
+    icon: mdi:numeric-1-circle
+    cards:
+      - type: markdown
+        content: "# View one"
+  - title: Two
+    path: two
+    icon: mdi:numeric-2-circle
+    cards:
+      - type: markdown
+        content: "# View two"
