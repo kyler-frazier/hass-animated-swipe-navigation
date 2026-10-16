@@ -34,7 +34,7 @@ npx playwright install chromium
 npm run hass:up   # disposable Home Assistant at http://localhost:8123 (user: test / test)
 ```
 
-The plugin file is mounted straight into that Home Assistant, so after editing
+This repo is mounted straight into that Home Assistant, so after editing
 `animated-swipe-navigation.js` just reload the page. Test dashboards live in
 `.hass/config/dashboards/`. Use Chrome DevTools' device mode to try gestures with a mouse.
 

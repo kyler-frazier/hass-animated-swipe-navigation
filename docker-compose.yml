@@ -12,7 +12,9 @@ services:
       - ./.hass/config/dashboards.yaml:/config/dashboards.yaml:ro
       - ./.hass/config/dashboards:/config/dashboards:ro
       - ./.hass/config/packages:/config/packages:ro
-      - ./animated-swipe-navigation.js:/config/www/animated-swipe-navigation.js:ro
+      # The folder, not the file: editors that save by replacing the file would leave a
+      # single-file mount serving the old version
+      - .:/config/www/plugin:ro
     healthcheck:
       test:
         [

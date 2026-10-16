@@ -16,7 +16,7 @@ runtime dependencies. Keep it that way.
 | `animated-swipe-navigation.js` | The plugin. The only file users install.                              |
 | `tests/`                       | Playwright tests (`*.spec.mjs`) and helpers.                          |
 | `.hass/`                       | Config for the disposable Home Assistant used by the tests.           |
-| `docker-compose.yml`           | Runs that Home Assistant, with the plugin mounted into `/config/www`. |
+| `docker-compose.yml`           | Runs that Home Assistant, with this repo mounted at `/config/www/plugin`. |
 | `.github/workflows/`           | Lint, tests, HACS validation, release.                                |
 
 ## Commands
