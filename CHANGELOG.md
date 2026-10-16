@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-15
+
 ### Added
 
 - `opacity` option for the whole bubble (default `0.75`).
@@ -33,6 +35,7 @@ All notable changes to this project are documented here. The format is based on
   `liquid`, `haptics` and colors.
 - Right-to-left language support and reduced-motion support.
 
-[Unreleased]: https://github.com/kyler-frazier/hass-animated-swipe-navigation/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/kyler-frazier/hass-animated-swipe-navigation/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/kyler-frazier/hass-animated-swipe-navigation/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/kyler-frazier/hass-animated-swipe-navigation/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/kyler-frazier/hass-animated-swipe-navigation/releases/tag/v0.1.0
