@@ -25,3 +25,7 @@ dashboards:
     mode: yaml
     title: Demo
     filename: dashboards/demo.yaml
+  test-custom:
+    mode: yaml
+    title: Custom look
+    filename: dashboards/custom.yaml

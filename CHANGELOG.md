@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- `opacity` option for the whole bubble (default `0.75`).
+- `shadow_color` and `view_fade` options, so every color and opacity is configurable.
+
+### Changed
+
+- Softer default look: darker grey bubble (`#272a2f`, `#383b42` once the swipe will navigate)
+  at 75% opacity, instead of turning the theme's primary color.
+
 ## [0.1.1] - 2026-10-15
 
 ### Fixed
