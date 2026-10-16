@@ -18,11 +18,11 @@ if [ ! -f /config/.storage/onboarding ]; then
 JSON
 fi
 
-# The plugin is mounted into /config/www, so it's served under /local
+# The repo is mounted at /config/www/plugin, so the plugin is served under /local/plugin
 cat > /config/.storage/lovelace_resources <<JSON
 { "version": 1, "minor_version": 1, "key": "lovelace_resources",
   "data": { "items": [
     { "id": "animated_swipe_navigation", "type": "module",
-      "url": "/local/animated-swipe-navigation.js?v=$(date +%s)" }
+      "url": "/local/plugin/animated-swipe-navigation.js?v=$(date +%s)" }
   ] } }
 JSON
