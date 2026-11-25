@@ -299,7 +299,7 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
         if (slide !== me) return;
         slide = null;
         anims.forEach((a) => a.cancel());
-        old.remove();
+        if (container.lastChild !== old) old.remove(); // else Home Assistant is showing it again
         clearStyles(old);
         old.inert = view.inert = false;
         container.style.overflow = "";
@@ -351,7 +351,7 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
         container.style.overflow = "";
       }, SWAP_TIMEOUT_MS);
       observer.observe(container, { childList: true });
-    }
+    } else if (container) container.style.overflow = "";
     const dash = location.pathname.split("/")[1];
     history.pushState(null, "", `/${dash}/${target.path}${location.search}${location.hash}`);
     window.dispatchEvent(new CustomEvent("location-changed"));

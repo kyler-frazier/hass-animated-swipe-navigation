@@ -92,7 +92,7 @@ test.describe("slide between views", () => {
       "--from-theme: 1;",
       false,
     ]);
-    expect(await container(page).evaluate((el) => el.style.overflow)).toBe("");
+    expect(await container(page).evaluate((el) => el.style.overflowX)).toBe("");
   });
 
   test("the header stays usable and the page doesn't scroll sideways", async ({ page }) => {
@@ -140,6 +140,33 @@ test.describe("slide between views", () => {
     expect(currentView(page)).toBe("three");
   });
 
+  test("going back during the slide keeps the old view", async ({ page }) => {
+    await openView(page, "/test-default/one");
+    await container(page).evaluate((el) => (window.__old = el.querySelector("hui-view")));
+    await slowDown(page, 0.1);
+    await swipeToNext(await touchscreen(page));
+    await expect.poll(() => slide(page)).not.toBe(null);
+    await page.evaluate(() => {
+      history.pushState(null, "", "/test-default/one");
+      window.dispatchEvent(new CustomEvent("location-changed"));
+    });
+    await expect
+      .poll(() => container(page).evaluate((el) => el.lastChild === window.__old))
+      .toBe(true);
+    await slowDown(page, 100);
+    const state = () =>
+      container(page).evaluate((el) => ({
+        views: [...el.querySelectorAll(":scope > hui-view")].length,
+        old: el.lastChild === window.__old,
+        inert: window.__old.inert,
+        position: window.__old.style.position,
+        animations: window.__old.getAnimations().length,
+      }));
+    await expect
+      .poll(state)
+      .toEqual({ views: 1, old: true, inert: false, position: "", animations: 0 });
+  });
+
   test("reduced motion switches without a slide", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await openView(page, "/test-default/one");
@@ -153,5 +180,6 @@ test.describe("slide between views", () => {
     await swipeToNext(await touchscreen(page));
     await expectView(page, "two");
     await expect.poll(() => page.evaluate(() => window.__maxViews)).toBe(1);
+    expect(await container(page).evaluate((el) => el.style.overflowX)).toBe("");
   });
 });
