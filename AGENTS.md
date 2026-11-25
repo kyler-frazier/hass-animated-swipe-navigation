@@ -41,10 +41,10 @@ test. The suite drives real touch events through the Chrome DevTools Protocol
   the start of each gesture. Dashboards without the block are untouched.
 - Navigates with `history.pushState` + a `location-changed` event, which is how the Home
   Assistant frontend navigates internally.
-- Slides between views with a view transition scoped to `hui-root`'s `#view` container. Scoping
-  keeps the header live and touches inside `hui-root`; names for a document-level transition
-  don't work from inside Home Assistant's shadow roots. `#view` covers itself with the snapshots
-  meanwhile, so taps don't reach cards.
+- Slides between views by putting the old `hui-view` back into `#view`, before the new one, until
+  the slide ends. `hui-root` only removes `#view`'s last child, so `viewEl()` takes that one.
+  Not view transitions: they capture the whole page as an image, which looked stretched on a phone
+  and came out blank far down a long page.
 - The bubble lives in `document.body`: a container with an SVG "goo" filter (blur + alpha
   threshold) holding a wall strip, a mound and a ball, plus a separate crisp `ha-icon`.
   `render()` positions everything from a single pull-progress value `p` (0..1).

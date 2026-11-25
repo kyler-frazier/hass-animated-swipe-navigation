@@ -19,22 +19,20 @@ const slowDown = async (page, rate) => {
   await cdp.send("Animation.setPlaybackRate", { playbackRate: rate });
 };
 
+const container = (page) => page.locator("hui-root #view");
+
 /** The running slide: { old, new } as [from, to] translate keyframes, or null. */
 const slide = (page) =>
-  page.evaluate(() => {
-    const found = {};
-    const container = document
-      .querySelector("home-assistant")
-      .shadowRoot.querySelector("home-assistant-main")
-      .shadowRoot.querySelector("partial-panel-resolver ha-panel-lovelace")
-      .shadowRoot.querySelector("hui-root")
-      .shadowRoot.querySelector("#view");
-    // document.getAnimations() leaves out shadow trees
-    for (const a of container.getAnimations({ subtree: true })) {
-      const which = a.effect?.pseudoElement?.match(/^::view-transition-(old|new)\(root\)$/)?.[1];
-      if (which) found[which] = a.effect.getKeyframes().map((k) => k.translate);
-    }
-    return found.old ? found : null;
+  container(page).evaluate((el) => {
+    const views = [...el.querySelectorAll(":scope > hui-view")];
+    if (views.length < 2) return null;
+    const [old, next] = views.map((v) =>
+      v
+        .getAnimations()[0]
+        ?.effect.getKeyframes()
+        .map((k) => k.translate),
+    );
+    return { old, new: next };
   });
 
 /** Counts clicks that reach the view's content. */
@@ -76,7 +74,25 @@ test.describe("slide between views", () => {
     await expect.poll(() => scrollTop(page)).toBe(300);
     await slowDown(page, 0.1);
     await swipeToPrevious(await touchscreen(page));
-    await expect.poll(async () => (await slide(page))?.old[0]).toBe("0px -300px");
+    await expect.poll(async () => (await slide(page))?.old?.[0]).toBe("0px -300px");
+  });
+
+  test("the old view keeps its size and is left clean", async ({ page }) => {
+    await openView(page, "/test-default/long");
+    const view = await container(page).locator("hui-view").elementHandle();
+    await view.evaluate((v) => v.style.setProperty("--from-theme", "1"));
+    const size = () => view.evaluate((v) => [v.offsetWidth, v.offsetHeight, v.offsetTop]);
+    const before = await size();
+    await slowDown(page, 0.1);
+    await swipeToPrevious(await touchscreen(page));
+    await expect.poll(() => slide(page)).not.toBe(null);
+    expect(await size()).toEqual(before);
+    await expect.poll(() => slide(page)).toBe(null);
+    expect(await view.evaluate((v) => [v.style.cssText, v.inert])).toEqual([
+      "--from-theme: 1;",
+      false,
+    ]);
+    expect(await container(page).evaluate((el) => el.style.overflow)).toBe("");
   });
 
   test("the header stays usable and the page doesn't scroll sideways", async ({ page }) => {
@@ -84,12 +100,8 @@ test.describe("slide between views", () => {
     await slowDown(page, 0.1);
     await swipeToNext(await touchscreen(page));
     await expect.poll(() => slide(page)).not.toBe(null);
-    const state = await page.evaluate(() => {
-      const root = document
-        .querySelector("home-assistant")
-        .shadowRoot.querySelector("home-assistant-main")
-        .shadowRoot.querySelector("partial-panel-resolver ha-panel-lovelace")
-        .shadowRoot.querySelector("hui-root").shadowRoot;
+    const state = await container(page).evaluate((el) => {
+      const root = el.getRootNode();
       const header = root.querySelector(".header");
       const { x, y, width, height } = header.getBoundingClientRect();
       return {
@@ -131,16 +143,15 @@ test.describe("slide between views", () => {
   test("reduced motion switches without a slide", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await openView(page, "/test-default/one");
-    await page.evaluate(() => {
-      window.__slides = 0;
-      const original = Element.prototype.startViewTransition;
-      Element.prototype.startViewTransition = function (...args) {
-        window.__slides++;
-        return original.apply(this, args);
-      };
+    await container(page).evaluate((el) => {
+      window.__maxViews = 0;
+      new MutationObserver(() => {
+        const n = el.querySelectorAll(":scope > hui-view").length;
+        window.__maxViews = Math.max(window.__maxViews, n);
+      }).observe(el, { childList: true });
     });
     await swipeToNext(await touchscreen(page));
     await expectView(page, "two");
-    expect(await page.evaluate(() => window.__slides)).toBe(0);
+    await expect.poll(() => page.evaluate(() => window.__maxViews)).toBe(1);
   });
 });

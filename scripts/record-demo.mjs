@@ -45,7 +45,7 @@ await page.evaluate(() => {
       if (!starts.has(a)) starts.set(a, window.__now - ms);
       a.pause();
       a.currentTime = window.__now - starts.get(a);
-      // A paused animation never ends, and a view transition waits for its animations
+      // A paused animation never ends, and a slide cleans up when its animation does
       if (a.currentTime >= a.effect.getComputedTiming().endTime) a.finish();
     }
   };
