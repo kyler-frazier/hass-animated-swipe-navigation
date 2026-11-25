@@ -34,6 +34,8 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
     view_fade: 0.2, // opacity the view loses at full pull
   };
 
+  const SLIDE_MS = 300; // slide from the old view to the new one
+  const SWAP_TIMEOUT_MS = 500; // longest wait for Home Assistant to show the new view
   const MAX_SHIFT = 28; // px
   const Y_FOLLOW = 0.25; // share of the finger's vertical movement the bubble follows
   const R = 28; // ball radius
@@ -75,6 +77,7 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
 
   let g = null; // current gesture
   let ui = null;
+  let slide = null; // running view transition
   let anim = 0; // rAF id of the release animation
   let popId = 0; // lets a new bubble invalidate a stale fade-out
   // Bubble state, kept separate from the gesture so animations can finish after release
@@ -275,30 +278,77 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
     if (snap < 1) requestAnimationFrame(() => snapTick(me));
   };
 
-  // Navigate right away so a quick follow-up swipe starts from the new view
-  const navigate = (panel, target, s, old) => {
+  // Slides the old view out and the new one in. Scoped to the view container, so the
+  // header stays put and taps on the page are ignored until it's done.
+  const slideViews = async (container, s, swap) => {
+    slide?.skipTransition();
+    const before = window.scrollY;
+    const t = (slide = container.startViewTransition(swap));
+    try {
+      await t.ready;
+      // Replace the browser's cross-fade
+      container.getAnimations({ subtree: true }).forEach((a) => {
+        if (a.effect.pseudoElement?.startsWith("::view-transition")) a.cancel();
+      });
+      // The page scrolls on navigation; the old view stays where it was on screen
+      const y = `${window.scrollY - before}px`;
+      const run = (which, from, to) =>
+        container.animate([{ translate: from }, { translate: to }], {
+          duration: SLIDE_MS,
+          easing: "cubic-bezier(.3,.4,.2,1)",
+          fill: "both",
+          pseudoElement: `::view-transition-${which}(root)`,
+        });
+      run("old", `0 ${y}`, `${s * 100}% ${y}`);
+      run("new", `${-s * 100}%`, "0%");
+    } catch (e) {
+      if (e.name !== "AbortError") throw e; // skipped by the next swipe
+    }
+    await t.finished;
+    if (slide === t) slide = null;
+  };
+
+  // The URL changes right away so a quick follow-up swipe starts from the new view
+  const navigate = async (panel, target, s, old) => {
     const dash = location.pathname.split("/")[1];
     history.pushState(null, "", `/${dash}/${target.path}${location.search}${location.hash}`);
-    window.dispatchEvent(new CustomEvent("location-changed"));
-    // HA caches views, so the old element comes back later: clear its exit styles
+    const changed = () => window.dispatchEvent(new CustomEvent("location-changed"));
+    const container = old?.parentElement;
+    // HA caches views, so the old element comes back later: clear its drag styles
     const resetOld = () => {
       if (old) old.style.transition = old.style.transform = old.style.opacity = "";
     };
-    if (reducedMotion?.matches) return resetOld();
-    let tries = 0;
-    const slideIn = () => {
-      const v = viewEl(panel);
-      if ((!v || v === old) && tries++ < 30) return requestAnimationFrame(slideIn);
-      resetOld();
-      v?.animate(
-        [
-          { translate: `${-s * 48}px 0`, opacity: 0 },
-          { translate: "0 0", opacity: 1 },
-        ],
-        { duration: 240, easing: "cubic-bezier(.2,.8,.2,1)" },
-      );
+    if (!container || reducedMotion?.matches) {
+      changed();
+      return resetOld();
+    }
+    const swapped = new Promise((resolve) => {
+      const done = () => {
+        observer.disconnect();
+        resetOld();
+        resolve();
+      };
+      const observer = new MutationObserver(() => {
+        const v = viewEl(panel);
+        if (v && v !== old) done();
+      });
+      observer.observe(container, { childList: true });
+      setTimeout(done, SWAP_TIMEOUT_MS); // e.g. the next swipe already went back here
+    });
+    const swap = () => {
+      changed();
+      return swapped;
     };
-    requestAnimationFrame(slideIn);
+    if (container.startViewTransition) return slideViews(container, s, swap);
+    // Browsers without element-scoped view transitions only slide the new view in
+    await swap();
+    viewEl(panel)?.animate(
+      [
+        { translate: `${-s * 48}px 0`, opacity: 0 },
+        { translate: "0 0", opacity: 1 },
+      ],
+      { duration: 240, easing: "cubic-bezier(.2,.8,.2,1)" },
+    );
   };
 
   // cancel: gesture aborted by the system, so no navigation happens
@@ -306,14 +356,11 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
     if (!g) return;
     const { panel, view, p, s, by, armed, target } = g;
     const container = view?.parentElement;
-    if (container) setTimeout(() => (container.style.overflowX = ""), 450);
+    const unclip = () => {
+      if (container && g?.view?.parentElement !== container) container.style.overflowX = "";
+    };
     const going = target && armed && !cancel;
-    if (view && going && !reducedMotion?.matches) {
-      // Keep sliding the old view out while the new one renders
-      view.style.transition = "transform .18s ease-in, opacity .18s ease-in";
-      view.style.transform = `translateX(${s * (MAX_SHIFT + 40)}px)`;
-      view.style.opacity = "0";
-    } else if (view) {
+    if (view && !going) {
       view.style.transition = "transform .22s ease-out, opacity .22s ease-out";
       view.style.transform = "";
       view.style.opacity = "";
@@ -321,7 +368,8 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
     }
     g.unlisten?.();
     g = null;
-    if (going) navigate(panel, target, s, view);
+    if (going) navigate(panel, target, s, view).finally(unclip);
+    else setTimeout(unclip, 250);
     if (!target || !ui || !bub?.drawn) {
       if (ui) hide();
       return;
@@ -409,7 +457,6 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
       x: t.clientX,
       y: t.clientY,
       mode: null,
-      view: viewEl(panel),
     };
     // Touch events stick to the element first touched. If a page switch removes that
     // element mid-drag, its events stop reaching window, so also listen on it directly.
@@ -442,6 +489,8 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
         return;
       }
       g.mode = "h";
+      slide?.skipTransition(); // a new swipe doesn't wait for the last one's slide
+      g.view = viewEl(g.panel);
       // Shifting right would overflow the page (scrollbar + jitter); clip it
       if (g.view?.parentElement) g.view.parentElement.style.overflowX = "clip";
       setDirection(dx > 0);

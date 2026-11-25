@@ -41,6 +41,10 @@ test. The suite drives real touch events through the Chrome DevTools Protocol
   the start of each gesture. Dashboards without the block are untouched.
 - Navigates with `history.pushState` + a `location-changed` event, which is how the Home
   Assistant frontend navigates internally.
+- Slides between views with a view transition scoped to `hui-root`'s `#view` container. Scoping
+  keeps the header live and touches inside `hui-root`; names for a document-level transition
+  don't work from inside Home Assistant's shadow roots. `#view` covers itself with the snapshots
+  meanwhile, so taps don't reach cards.
 - The bubble lives in `document.body`: a container with an SVG "goo" filter (blur + alpha
   threshold) holding a wall strip, a mound and a ball, plus a separate crisp `ha-icon`.
   `render()` positions everything from a single pull-progress value `p` (0..1).
@@ -48,7 +52,8 @@ test. The suite drives real touch events through the Chrome DevTools Protocol
 ## Invariants (each one fixes a real bug, and each has a test)
 
 - **Navigate immediately on release.** Delaying navigation until an exit animation ends makes a
-  quick second swipe compute its target from the old view.
+  quick second swipe compute its target from the old view. The URL changes synchronously; a new
+  horizontal drag skips a slide that's still running.
 - **Claim sideways moves before deciding.** `preventDefault` sideways-leaning moves under
   `DECIDE_PX`; otherwise the browser starts its own pan and fires `pointercancel`, and the
   swipe is lost. Do **not** treat `pointercancel` as the end of a gesture.
