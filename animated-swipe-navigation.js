@@ -376,7 +376,8 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
       view.style.opacity = "";
       setTimeout(() => {
         view.style.transition = "";
-        if (!g?.mode && !slide) container.style.overflow = "";
+        // A pending view swap (stopSwap) or slide unclips the page itself
+        if (!g?.mode && !slide && !stopSwap) container.style.overflow = "";
       }, 250);
     }
     g.unlisten?.();
