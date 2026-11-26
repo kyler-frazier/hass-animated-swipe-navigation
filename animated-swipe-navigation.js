@@ -78,6 +78,7 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
   let g = null; // current gesture
   let ui = null;
   let slide = null; // running slide between views
+  let stopSwap = null; // stops waiting for the last navigation's view swap
   let anim = 0; // rAF id of the release animation
   let popId = 0; // lets a new bubble invalidate a stale fade-out
   // Bubble state, kept separate from the gesture so animations can finish after release
@@ -318,10 +319,10 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
   };
 
   // The URL changes right away so a quick follow-up swipe starts from the new view
-  const navigate = (panel, target, s, old) => {
-    const container = old?.parentElement;
-    const animated = container && !reducedMotion?.matches;
-    if (animated) {
+  // container: where the old view was when the drag began; Home Assistant may have removed it since
+  const navigate = (panel, target, s, old, container) => {
+    stopSwap?.(); // a newer navigation takes over the old view
+    if (old && old.parentElement === container && !reducedMotion?.matches) {
       const place = {
         top: `${old.offsetTop}px`,
         left: `${old.offsetLeft}px`,
@@ -342,7 +343,9 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
       const stop = () => {
         observer.disconnect();
         clearTimeout(timer);
+        if (stopSwap === stop) stopSwap = null;
       };
+      stopSwap = stop;
       // No swap if, say, the next swipe already went back
       const timer = setTimeout(() => {
         stop();
@@ -351,7 +354,10 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
         container.style.overflow = "";
       }, SWAP_TIMEOUT_MS);
       observer.observe(container, { childList: true });
-    } else if (container) container.style.overflow = "";
+    } else {
+      if (old) clearStyles(old);
+      if (container) container.style.overflow = "";
+    }
     const dash = location.pathname.split("/")[1];
     history.pushState(null, "", `/${dash}/${target.path}${location.search}${location.hash}`);
     window.dispatchEvent(new CustomEvent("location-changed"));
@@ -360,8 +366,7 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
   // cancel: gesture aborted by the system, so no navigation happens
   const release = (cancel = false) => {
     if (!g) return;
-    const { panel, view, p, s, by, armed, target } = g;
-    const container = view?.parentElement;
+    const { panel, view, container, p, s, by, armed, target } = g;
     const going = target && armed && !cancel;
     if (view && !going) {
       view.style.transition = "transform .22s ease-out, opacity .22s ease-out";
@@ -374,7 +379,7 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
     }
     g.unlisten?.();
     g = null;
-    if (going) navigate(panel, target, s, view);
+    if (going) navigate(panel, target, s, view, container);
     if (!target || !ui || !bub?.drawn) {
       if (ui) hide();
       return;
@@ -496,8 +501,9 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
       g.mode = "h";
       slide?.finish(); // a new swipe doesn't wait for the last one's slide
       g.view = viewEl(g.panel);
+      g.container = g.view?.parentElement;
       // Shifting right would overflow the page (scrollbar + jitter); clip it
-      if (g.view?.parentElement) g.view.parentElement.style.overflowX = "clip";
+      if (g.container) g.container.style.overflowX = "clip";
       setDirection(dx > 0);
     } else if (dx !== 0 && dx > 0 !== g.fingerRight) {
       // Navigation follows the final direction, so the bubble has to as well

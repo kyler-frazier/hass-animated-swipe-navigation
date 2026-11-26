@@ -4,6 +4,7 @@ import {
   expectView,
   FAR,
   openView,
+  SHORT,
   scrollTop,
   touchscreen,
 } from "./helpers/touch.mjs";
@@ -165,6 +166,89 @@ test.describe("slide between views", () => {
     await expect
       .poll(state)
       .toEqual({ views: 1, old: true, inert: false, position: "", animations: 0 });
+  });
+
+  test("two swipes before the view swap slide once and leave every view clean", async ({
+    page,
+  }) => {
+    await openView(page, "/test-default/one");
+    // Home Assistant shows each new view only after a delay
+    await container(page).evaluate((el) => {
+      const root = el.getRootNode().host;
+      const select = root._selectView;
+      window.__delayed = 0;
+      root._selectView = function (...args) {
+        window.__delayed++;
+        setTimeout(() => select.apply(this, args), 300);
+      };
+      window.__root = root;
+      window.__slides = 0; // view animations started
+      const animate = Element.prototype.animate;
+      Element.prototype.animate = function (...args) {
+        if (this.tagName === "HUI-VIEW") window.__slides++;
+        return animate.apply(this, args);
+      };
+    });
+    const ts = await touchscreen(page);
+    // Quick swipes, so the second ends before the first view swap
+    for (let i = 0; i < 2; i++) await ts.swipe([330, Y], [330 - FAR, Y], { step: 40 });
+    await expectView(page, "three");
+    await expect.poll(() => page.evaluate(() => window.__delayed)).toBe(2);
+    // Only the third view is left in the page
+    await expect
+      .poll(() =>
+        container(page).evaluate((el) =>
+          [...el.querySelectorAll(":scope > hui-view")].map((v) =>
+            Object.keys(window.__root._viewCache).find((k) => window.__root._viewCache[k] === v),
+          ),
+        ),
+      )
+      .toEqual(["2"]);
+    await page.waitForTimeout(600); // past every cleanup timer
+    const views = () =>
+      page.evaluate(() =>
+        Object.values(window.__root._viewCache).map((v) => ({
+          style: v.style.cssText,
+          inert: v.inert,
+          animations: v.getAnimations().length,
+        })),
+      );
+    expect(await views()).toEqual(Array(3).fill({ style: "", inert: false, animations: 0 }));
+    // One slide from the first view to the second: two views animated
+    expect(await page.evaluate(() => window.__slides)).toBe(2);
+  });
+
+  test("a view removed during the drag is left clean", async ({ page }) => {
+    const errors = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await openView(page, "/test-default/two");
+    await container(page).evaluate((el) => (window.__old = el.querySelector("hui-view")));
+    const showView = (path) =>
+      page.evaluate((path) => {
+        history.pushState(null, "", `/test-default/${path}`);
+        window.dispatchEvent(new CustomEvent("location-changed"));
+      }, path);
+    const ts = await touchscreen(page);
+    for (const far of [true, false]) {
+      await ts.down([330, Y]);
+      await ts.drag([330, Y], [330 - (far ? FAR : SHORT), Y]);
+      await showView("one"); // removes the dragged view
+      await expect
+        .poll(() => container(page).evaluate((el) => el.contains(window.__old)))
+        .toBe(false);
+      await ts.up();
+      await page.waitForTimeout(600); // past every cleanup timer
+      expect(await page.evaluate(() => [window.__old.style.cssText, window.__old.inert])).toEqual([
+        "",
+        false,
+      ]);
+      expect(await container(page).evaluate((el) => el.style.overflowX)).toBe("");
+      await showView("two");
+      await expect
+        .poll(() => container(page).evaluate((el) => el.lastChild === window.__old))
+        .toBe(true);
+    }
+    expect(errors).toEqual([]);
   });
 
   test("reduced motion switches without a slide", async ({ page }) => {
