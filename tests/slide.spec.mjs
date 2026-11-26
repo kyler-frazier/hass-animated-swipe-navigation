@@ -218,9 +218,37 @@ test.describe("slide between views", () => {
     expect(await page.evaluate(() => window.__slides)).toBe(2);
   });
 
+  test("a drag held through the view swap moves the new view", async ({ page }) => {
+    await openView(page, "/test-default/one");
+    // Home Assistant shows the new view only after a delay
+    await container(page).evaluate((el) => {
+      const root = el.getRootNode().host;
+      const select = root._selectView;
+      root._selectView = function (...args) {
+        window.__swapped = new Promise((done) =>
+          setTimeout(() => done(select.apply(this, args)), 300),
+        );
+      };
+    });
+    const ts = await touchscreen(page);
+    await ts.swipe([330, Y], [330 - FAR, Y], { step: 40 });
+    await ts.down([330, Y]);
+    await ts.drag([330, Y], [330 - SHORT, Y]);
+    const dragged = await container(page).evaluate((el) => el.lastElementChild.style.cssText);
+    expect(dragged).toContain("translateX(-");
+    await page.evaluate(() => window.__swapped);
+    await expectView(page, "two");
+    // No touchmove since the swap: the new view takes over where the drag is
+    expect(await container(page).evaluate((el) => el.lastElementChild.style.cssText)).toBe(dragged);
+    await ts.up();
+  });
+
   test("a view removed during the drag is left clean", async ({ page }) => {
     const errors = [];
-    page.on("pageerror", (e) => errors.push(e.message));
+    // Only our own errors: Home Assistant's service worker code sometimes throws in CI
+    page.on("pageerror", (e) => {
+      if (e.stack?.includes("animated-swipe-navigation")) errors.push(e.message);
+    });
     await openView(page, "/test-default/two");
     await container(page).evaluate((el) => (window.__old = el.querySelector("hui-view")));
     const showView = (path) =>

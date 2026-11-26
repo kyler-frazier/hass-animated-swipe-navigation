@@ -336,8 +336,10 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
         if (!view || view === old) return;
         stop();
         if (!g?.mode) return slideViews(container, s, old, view, place, scrolled);
-        // The next drag is already under way: hand it the new view
+        // The next drag is already under way: hand it the new view, where the drag is
+        const { transform, opacity } = old.style;
         clearStyles(old);
+        Object.assign(view.style, { transform, opacity });
         g.view = view;
       });
       const stop = () => {
