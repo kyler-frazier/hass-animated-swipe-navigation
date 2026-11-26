@@ -243,6 +243,26 @@ test.describe("slide between views", () => {
     await ts.up();
   });
 
+  test("a pending view swap keeps the page clipped", async ({ page }) => {
+    await openView(page, "/test-default/two");
+    // Home Assistant shows the new view only after a delay; note the clip just before
+    await container(page).evaluate((el) => {
+      const root = el.getRootNode().host;
+      const select = root._selectView;
+      root._selectView = function (...args) {
+        setTimeout(() => {
+          window.__clip = el.style.overflowX;
+          select.apply(this, args);
+        }, 300);
+      };
+    });
+    const ts = await touchscreen(page);
+    // A short drag back, then right away a swipe to the previous view
+    await ts.swipe([80, Y], [80 + SHORT, Y], { step: SHORT });
+    await ts.swipe([80, Y], [80 + FAR, Y], { step: FAR });
+    await expect.poll(() => page.evaluate(() => window.__clip)).toBe("clip");
+  });
+
   test("a view removed during the drag is left clean", async ({ page }) => {
     const errors = [];
     // Only our own errors: Home Assistant's service worker code sometimes throws in CI
