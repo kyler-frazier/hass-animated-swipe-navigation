@@ -7,10 +7,34 @@ import {
   FAR,
   openView,
   scrollTop,
+  SHORT,
   touchscreen,
 } from "./helpers/touch.mjs";
 
 const Y = 600;
+
+/** Records every outline the bubble draws, in window.__outlines. */
+const recordOutlines = (page) =>
+  page.evaluate(() => {
+    window.__outlines = [];
+    const set = Element.prototype.setAttribute;
+    Element.prototype.setAttribute = function (name, value) {
+      if (name === "d" && this.closest(".asn-bubble")) window.__outlines.push(value);
+      return set.call(this, name, value);
+    };
+  });
+
+/** Waits for n animation frames. */
+const frames = (page, n) =>
+  page.evaluate(
+    (n) =>
+      new Promise((done) =>
+        (function tick(k) {
+          k ? requestAnimationFrame(() => tick(k - 1)) : done();
+        })(n),
+      ),
+    n,
+  );
 
 test.describe("bubble and gestures", () => {
   test("bubble shows the destination icon while dragging, then goes away", async ({ page }) => {
@@ -84,5 +108,48 @@ test.describe("bubble and gestures", () => {
     });
     expect(filters).toEqual([]);
     await ts.up();
+  });
+  test("holding still doesn't redraw the bubble's outline", async ({ page }) => {
+    await openView(page, "/test-default/one");
+    await recordOutlines(page);
+    const ts = await touchscreen(page);
+    await ts.down([330, Y]);
+    await ts.drag([330, Y], [330 - SHORT, Y]);
+    await frames(page, 20); // the water catches up
+    const before = await page.evaluate(() => window.__outlines.length);
+    await frames(page, 20);
+    expect(await page.evaluate(() => window.__outlines.length)).toBe(before);
+    await ts.up();
+  });
+
+  test("the mound drains away at the wall without a spike", async ({ page }) => {
+    await openView(page, "/test-default/one");
+    await recordOutlines(page);
+    const ts = await touchscreen(page);
+    await ts.down([330, Y]);
+    await ts.drag([330, Y], [330 - FAR, Y]);
+    await frames(page, 40); // past the pinch-off
+    await ts.up();
+    // How far whatever is left at the wall reaches out, frame by frame, once the ball is
+    // off on its own (in the wall's frame: the screen edge is x = 0)
+    const reach = (await page.evaluate(() => window.__outlines))
+      .map((d) => d.split("M").filter(Boolean))
+      .filter((loops) => loops.length > 1)
+      .map((loops) => {
+        const ends = loops
+          .map((l) =>
+            Math.max(
+              ...l
+                .match(/-?[\d.]+/g)
+                .filter((_, k) => k % 2 === 0)
+                .map(Number),
+            ),
+          )
+          .sort((a, b) => a - b);
+        return ends.at(-2); // the ball reaches furthest
+      });
+    const last = reach.findLastIndex((x) => x > -7); // flat wall: x = -8
+    expect(last).toBeGreaterThan(0);
+    expect(reach[last]).toBeLessThan(1);
   });
 });

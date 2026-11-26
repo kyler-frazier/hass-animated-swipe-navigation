@@ -154,12 +154,14 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
   };
 
   // Signed distance from (x, y) to an ellipse around the origin: negative inside.
-  // Close approximation, exact for circles.
+  // Close approximation, exact for circles. No point inside is further from the edge
+  // than the smaller radius, so a thin ellipse thins out instead of leaving a spike.
   const ellipse = (x, y, rx, ry) => {
     if (rx <= 0 || ry <= 0) return Infinity;
     const k0 = Math.hypot(x / rx, y / ry);
     const k1 = Math.hypot(x / (rx * rx), y / (ry * ry));
-    return k1 ? (k0 * (k0 - 1)) / k1 : -Math.min(rx, ry);
+    const deepest = -Math.min(rx, ry);
+    return k1 ? Math.max((k0 * (k0 - 1)) / k1, deepest) : deepest;
   };
 
   // Like Math.min, but two shapes within MELT of each other join with a smooth neck
@@ -284,7 +286,12 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
     const field = (x, y) => melt(melt(x + 8, ellipse(x, y, a, b)), ellipse(x - cx, y, rx, ry));
     const reach = Math.max(a, cx + rx) + MELT;
     const tall = Math.max(b, ry) + MELT;
-    shape.setAttribute("d", outline(field, -3 * GRID, reach, -tall, tall));
+    // Holding still gives the same shape every frame
+    const key = `${a} ${b} ${cx} ${rx}`; // ry follows from rx
+    if (key !== ui.outlineKey) {
+      ui.outlineKey = key;
+      shape.setAttribute("d", outline(field, -3 * GRID, reach, -tall, tall));
+    }
     shape.setAttribute("transform", `translate(${wallX} ${BOX_H / 2}) scale(${s} 1)`);
     // Positions use the `translate` property so the fade's animations don't clash
     const iconScale = 0.5 + 0.5 * clamp01((p - 0.3) / 0.6);
