@@ -34,10 +34,19 @@ await page.evaluate(() => {
   const starts = new WeakMap();
   window.__step = (ms) => {
     window.__now += ms;
-    for (const a of document.getAnimations()) {
+    const view = document
+      .querySelector("home-assistant")
+      .shadowRoot.querySelector("home-assistant-main")
+      .shadowRoot.querySelector("partial-panel-resolver ha-panel-lovelace")
+      .shadowRoot.querySelector("hui-root")
+      .shadowRoot.querySelector("#view");
+    // document.getAnimations() leaves out shadow trees
+    for (const a of [...document.getAnimations(), ...view.getAnimations({ subtree: true })]) {
       if (!starts.has(a)) starts.set(a, window.__now - ms);
       a.pause();
       a.currentTime = window.__now - starts.get(a);
+      // A paused animation never ends, and a slide cleans up when its animation does
+      if (a.currentTime >= a.effect.getComputedTiming().endTime) a.finish();
     }
   };
   // Finger indicator
@@ -61,7 +70,8 @@ const frame = async (touch) => {
     await page.evaluate(([x, y]) => window.__finger(x, y), p ? [p.x, p.y] : [null, null]);
   }
   await page.evaluate((ms) => window.__step(ms), FRAME_MS);
-  await page.waitForTimeout(40); // let rAF callbacks draw the new time
+  await page.waitForTimeout(120); // let rAF callbacks draw the new time and a slide start
+  await page.evaluate(() => window.__step(0)); // hold new animations at their start
   await page.screenshot({ path: `${out}/${String(n++).padStart(3, "0")}.png` });
 };
 const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);

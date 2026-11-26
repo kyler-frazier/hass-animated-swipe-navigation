@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+
+- Letting go now slides the old view out and the new one in, with the header staying put. Taps on
+  the page wait until the slide is done; a new swipe doesn't.
+
 ## [0.2.0] - 2026-10-15
 
 ### Added

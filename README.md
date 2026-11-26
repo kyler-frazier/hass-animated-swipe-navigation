@@ -18,8 +18,9 @@ view you're heading to, and snaps free with a little bounce once letting go will
 - **Live drag feedback.** The bubble grows out of the edge as you pull, stretches against the
   wall's surface tension, then pinches off and bounces when the swipe is far enough. Drag back
   and it re-merges with the wall. The current view follows your finger slightly.
-- **Immediate, reliable navigation.** The view changes the moment you let go, so fast
-  back-to-back swipes always count from the right view.
+- **Immediate, reliable navigation.** The view changes the moment you let go: the old one slides
+  out as the new one slides in, under a header that stays put. Fast back-to-back swipes don't wait
+  for the slide and always count from the right view.
 - **Plays well with scrolling.** Vertical scrolling is locked only while you're swiping
   sideways. Swipes that start on sliders, tabs, maps and similar controls are ignored.
 - **Handles real fingers.** Direction changes mid-drag, second fingers, slow drags and fast

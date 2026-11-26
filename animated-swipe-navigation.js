@@ -34,6 +34,8 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
     view_fade: 0.2, // opacity the view loses at full pull
   };
 
+  const SLIDE_MS = 300; // slide from the old view to the new one
+  const SWAP_TIMEOUT_MS = 500; // longest wait for Home Assistant to show the new view
   const MAX_SHIFT = 28; // px
   const Y_FOLLOW = 0.25; // share of the finger's vertical movement the bubble follows
   const R = 28; // ball radius
@@ -75,6 +77,8 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
 
   let g = null; // current gesture
   let ui = null;
+  let slide = null; // running slide between views
+  let stopSwap = null; // stops waiting for the last navigation's view swap
   let anim = 0; // rAF id of the release animation
   let popId = 0; // lets a new bubble invalidate a stale fade-out
   // Bubble state, kept separate from the gesture so animations can finish after release
@@ -90,7 +94,9 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
       ?.shadowRoot?.querySelector("partial-panel-resolver ha-panel-lovelace");
 
   const viewEl = (panel) =>
-    panel?.shadowRoot?.querySelector("hui-root")?.shadowRoot?.querySelector("#view hui-view");
+    panel?.shadowRoot
+      ?.querySelector("hui-root")
+      ?.shadowRoot?.querySelector("#view > hui-view:last-child");
 
   const options = (panel) => {
     const raw = panel?.lovelace?.config?.[CONFIG_KEY];
@@ -275,53 +281,108 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
     if (snap < 1) requestAnimationFrame(() => snapTick(me));
   };
 
-  // Navigate right away so a quick follow-up swipe starts from the new view
-  const navigate = (panel, target, s, old) => {
+  // HA caches views, so an old view comes back later. Leaves HA's own inline styles alone.
+  const clearStyles = (view) => {
+    for (const p of "transition transform opacity position top left width height".split(" "))
+      view.style[p] = "";
+  };
+
+  // Slides the old view out and the new one in, below the header, which stays put.
+  // Home Assistant only ever removes the container's last child, so the old view can
+  // stay in front of the new one in the DOM until it's gone from the screen.
+  const slideViews = (container, s, old, view, place, scrolled) => {
+    Object.assign(old.style, { position: "absolute", ...place });
+    view.before(old);
+    container.style.overflow = "clip";
+    old.inert = view.inert = true; // taps wait for the slide
+    const me = (slide = {
+      finish: () => {
+        if (slide !== me) return;
+        slide = null;
+        anims.forEach((a) => a.cancel());
+        if (container.lastChild !== old) old.remove(); // else Home Assistant is showing it again
+        clearStyles(old);
+        old.inert = view.inert = false;
+        container.style.overflow = "";
+      },
+    });
+    // Navigating scrolls the page; the old view stays where it was on screen
+    const y = `${window.scrollY - scrolled}px`;
+    const run = (el, from, to) =>
+      el.animate([{ translate: from }, { translate: to }], {
+        duration: SLIDE_MS,
+        easing: "cubic-bezier(.3,.4,.2,1)",
+        fill: "both",
+      });
+    const anims = [run(old, `0px ${y}`, `${s * 100}% ${y}`), run(view, `${-s * 100}%`, "0%")];
+    anims[1].onfinish = me.finish;
+  };
+
+  // The URL changes right away so a quick follow-up swipe starts from the new view
+  // container: where the old view was when the drag began; Home Assistant may have removed it since
+  const navigate = (panel, target, s, old, container) => {
+    stopSwap?.(); // a newer navigation takes over the old view
+    if (old && old.parentElement === container && !reducedMotion?.matches) {
+      const place = {
+        top: `${old.offsetTop}px`,
+        left: `${old.offsetLeft}px`,
+        width: `${old.offsetWidth}px`,
+        height: `${old.offsetHeight}px`,
+      };
+      const scrolled = window.scrollY;
+      // Runs right after the swap, before the old view's disappearance is painted
+      const observer = new MutationObserver(() => {
+        const view = viewEl(panel);
+        if (!view || view === old) return;
+        stop();
+        if (!g?.mode) return slideViews(container, s, old, view, place, scrolled);
+        // The next drag is already under way: hand it the new view, where the drag is
+        const { transform, opacity } = old.style;
+        clearStyles(old);
+        Object.assign(view.style, { transform, opacity });
+        g.view = view;
+      });
+      const stop = () => {
+        observer.disconnect();
+        clearTimeout(timer);
+        if (stopSwap === stop) stopSwap = null;
+      };
+      stopSwap = stop;
+      // No swap if, say, the next swipe already went back
+      const timer = setTimeout(() => {
+        stop();
+        if (g?.mode && g.view === old) return; // being dragged again
+        clearStyles(old);
+        container.style.overflow = "";
+      }, SWAP_TIMEOUT_MS);
+      observer.observe(container, { childList: true });
+    } else {
+      if (old) clearStyles(old);
+      if (container) container.style.overflow = "";
+    }
     const dash = location.pathname.split("/")[1];
     history.pushState(null, "", `/${dash}/${target.path}${location.search}${location.hash}`);
     window.dispatchEvent(new CustomEvent("location-changed"));
-    // HA caches views, so the old element comes back later: clear its exit styles
-    const resetOld = () => {
-      if (old) old.style.transition = old.style.transform = old.style.opacity = "";
-    };
-    if (reducedMotion?.matches) return resetOld();
-    let tries = 0;
-    const slideIn = () => {
-      const v = viewEl(panel);
-      if ((!v || v === old) && tries++ < 30) return requestAnimationFrame(slideIn);
-      resetOld();
-      v?.animate(
-        [
-          { translate: `${-s * 48}px 0`, opacity: 0 },
-          { translate: "0 0", opacity: 1 },
-        ],
-        { duration: 240, easing: "cubic-bezier(.2,.8,.2,1)" },
-      );
-    };
-    requestAnimationFrame(slideIn);
   };
 
   // cancel: gesture aborted by the system, so no navigation happens
   const release = (cancel = false) => {
     if (!g) return;
-    const { panel, view, p, s, by, armed, target } = g;
-    const container = view?.parentElement;
-    if (container) setTimeout(() => (container.style.overflowX = ""), 450);
+    const { panel, view, container, p, s, by, armed, target } = g;
     const going = target && armed && !cancel;
-    if (view && going && !reducedMotion?.matches) {
-      // Keep sliding the old view out while the new one renders
-      view.style.transition = "transform .18s ease-in, opacity .18s ease-in";
-      view.style.transform = `translateX(${s * (MAX_SHIFT + 40)}px)`;
-      view.style.opacity = "0";
-    } else if (view) {
+    if (view && !going) {
       view.style.transition = "transform .22s ease-out, opacity .22s ease-out";
       view.style.transform = "";
       view.style.opacity = "";
-      setTimeout(() => (view.style.transition = ""), 250);
+      setTimeout(() => {
+        view.style.transition = "";
+        // A pending view swap (stopSwap) or slide unclips the page itself
+        if (!g?.mode && !slide && !stopSwap) container.style.overflow = "";
+      }, 250);
     }
     g.unlisten?.();
     g = null;
-    if (going) navigate(panel, target, s, view);
+    if (going) navigate(panel, target, s, view, container);
     if (!target || !ui || !bub?.drawn) {
       if (ui) hide();
       return;
@@ -409,7 +470,6 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
       x: t.clientX,
       y: t.clientY,
       mode: null,
-      view: viewEl(panel),
     };
     // Touch events stick to the element first touched. If a page switch removes that
     // element mid-drag, its events stop reaching window, so also listen on it directly.
@@ -442,8 +502,11 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
         return;
       }
       g.mode = "h";
+      slide?.finish(); // a new swipe doesn't wait for the last one's slide
+      g.view = viewEl(g.panel);
+      g.container = g.view?.parentElement;
       // Shifting right would overflow the page (scrollbar + jitter); clip it
-      if (g.view?.parentElement) g.view.parentElement.style.overflowX = "clip";
+      if (g.container) g.container.style.overflowX = "clip";
       setDirection(dx > 0);
     } else if (dx !== 0 && dx > 0 !== g.fingerRight) {
       // Navigation follows the final direction, so the bubble has to as well
