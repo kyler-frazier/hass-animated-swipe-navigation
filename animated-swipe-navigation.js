@@ -30,7 +30,6 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
     bubble_active_color: "#383b42",
     icon_color: "#b4b7bf",
     icon_active_color: "rgba(255, 255, 255, .85)",
-    shadow_color: "rgba(0, 0, 0, .35)",
     view_fade: 0.2, // opacity the view loses at full pull
   };
 
@@ -42,12 +41,15 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
   const GAP = 14; // ball's distance from the wall once out
   const BOX_W = 200,
     BOX_H = 340,
-    WALL = 40; // goo canvas; wall sits WALL px inside it
+    WALL = 40; // bubble's box; wall sits WALL px inside it
   const MOUND_H = [120, 45]; // wall mound half-height: at rest -> once the ball is out
   const MOUND_W = [30, 8]; // mound protrusion: peak -> at the threshold (thin neck)
   const SNAP_MS = 130; // neck pinch-off duration
-  const STRETCH = [1.2, 0.84]; // ball scale x/y at full tension
+  const STRETCH = 1.2; // ball's width at full tension, x its height shrinks by
   const BOUNCE_MS = 440;
+  const BOUNCE = [135, 210]; // ball wobble after the snap: decay time, period (ms)
+  const MELT = 12; // shapes closer than this melt together (px)
+  const GRID = 3; // outline is traced on a grid this fine (px)
   const FLICK_MS = 50; // swipes that snap sooner never show water
   const WATER_LAG_MS = 50; // time constant
   const CATCHUP_MS = 50; // lag shrinks to 0 over this
@@ -135,33 +137,99 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
   };
 
   const makeUi = () => {
-    // Gooey filter: blur + alpha threshold makes nearby shapes melt together
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("style", "position:absolute;width:0;height:0");
-    svg.setAttribute("aria-hidden", "true");
-    svg.innerHTML = `<filter id="asn-goo" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="b"/>
-      <feColorMatrix in="b" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 22 -10"/></filter>`;
-    const box = document.createElement("div");
-    box.className = "asn-bubble";
+    const box = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    box.classList.add("asn-bubble");
+    box.setAttribute("aria-hidden", "true");
     box.style.cssText = `position:fixed;z-index:9;top:0;left:0;width:${BOX_W}px;height:${BOX_H}px;
       pointer-events:none;display:none`;
-    const shape = "position:absolute;left:0;top:0;border-radius:50%;transition:background .15s;";
-    const bump = document.createElement("div");
-    const ball = document.createElement("div");
-    bump.style.cssText = shape;
-    ball.style.cssText = shape + `width:${2 * R}px;height:${2 * R}px`;
-    // Hidden strip just past the wall: the goo blends the mound's base into it,
-    // giving a bell-curve flare instead of a pointy mound
-    const strip = document.createElement("div");
-    strip.style.cssText = `position:absolute;top:0;width:${WALL - 8}px;height:${BOX_H}px;`;
-    box.append(strip, bump, ball);
+    const shape = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    shape.style.transition = "fill .15s";
+    box.append(shape);
     const icon = document.createElement("ha-icon");
     icon.className = "asn-icon";
     icon.style.cssText = `position:fixed;z-index:10;top:0;left:0;pointer-events:none;display:none;
       --mdc-icon-size:26px;transition:color .15s`;
-    document.body.append(svg, box, icon);
-    return { box, strip, bump, ball, icon };
+    document.body.append(box, icon);
+    return { box, shape, icon };
+  };
+
+  // Signed distance from (x, y) to an ellipse around the origin: negative inside.
+  // Close approximation, exact for circles.
+  const ellipse = (x, y, rx, ry) => {
+    if (rx <= 0 || ry <= 0) return Infinity;
+    const k0 = Math.hypot(x / rx, y / ry);
+    const k1 = Math.hypot(x / (rx * rx), y / (ry * ry));
+    return k1 ? (k0 * (k0 - 1)) / k1 : -Math.min(rx, ry);
+  };
+
+  // Like Math.min, but two shapes within MELT of each other join with a smooth neck
+  const melt = (a, b) => {
+    const h = Math.max(MELT - Math.abs(a - b), 0) / MELT;
+    return Math.min(a, b) - (h * h * MELT) / 4;
+  };
+
+  // Outline of the area where f(x, y) < 0, within x0..x1, y0..y1, as SVG path data.
+  // Marching squares: each grid cell the outline crosses gets a segment from where it
+  // enters to where it leaves; chained up, the segments make closed loops.
+  const outline = (f, x0, x1, y0, y1) => {
+    const nx = Math.ceil((x1 - x0) / GRID) + 1;
+    const ny = Math.ceil((y1 - y0) / GRID) + 1;
+    const v = new Float64Array(nx * ny);
+    for (let j = 0; j < ny; j++)
+      for (let i = 0; i < nx; i++) {
+        const edge = i === 0 || j === 0 || i === nx - 1 || j === ny - 1;
+        v[j * nx + i] = edge ? 1 : f(x0 + i * GRID, y0 + j * GRID); // closes every loop
+      }
+    // Grid edges by id: 2 * point + 0 for the one going +x, + 1 for the one going +y
+    const point = (id) => {
+      const a = id >> 1;
+      const b = a + (id & 1 ? nx : 1);
+      const k = v[a] / (v[a] - v[b]);
+      const i = a % nx;
+      const j = (a - i) / nx;
+      const x = x0 + (i + (id & 1 ? 0 : k)) * GRID;
+      const y = y0 + (j + (id & 1 ? k : 0)) * GRID;
+      return `${x.toFixed(1)} ${y.toFixed(1)}`;
+    };
+    const next = new Map(); // edge where the outline enters a cell -> edge where it leaves
+    for (let j = 0; j < ny - 1; j++)
+      for (let i = 0; i < nx - 1; i++) {
+        const c = [j * nx + i, j * nx + i + 1, (j + 1) * nx + i + 1, (j + 1) * nx + i];
+        // The cell's sides, going around it: from corner, to corner, edge id
+        const sides = [
+          [c[0], c[1], 2 * c[0]],
+          [c[1], c[2], 2 * c[1] + 1],
+          [c[2], c[3], 2 * c[3]],
+          [c[3], c[0], 2 * c[0] + 1],
+        ];
+        const cross = sides.filter(([a, b]) => v[a] < 0 !== v[b] < 0);
+        if (!cross.length) continue;
+        // Pair neighboring crossings, the outline going in at one and out at the other.
+        // A saddle cell has two pairings: pairs that start going out join its two inside
+        // corners, which is right when the cell's center is inside.
+        const join = c.reduce((sum, k) => sum + v[k], 0) < 0;
+        const out = ([a]) => v[a] < 0; // the outline leaves the inside here
+        const shift = cross.length === 4 && join !== out(cross[0]) ? 1 : 0;
+        const ring = [...cross.slice(shift), ...cross.slice(0, shift)];
+        for (let k = 0; k < ring.length; k += 2) {
+          const [a, b] = out(ring[k]) ? [ring[k + 1], ring[k]] : [ring[k], ring[k + 1]];
+          next.set(a[2], b[2]);
+        }
+      }
+    let d = "";
+    for (const start of next.keys()) {
+      if (!next.has(start)) continue; // already part of a loop
+      d += `M${point(start)}`;
+      for (let id = next.get(start); ;) {
+        const after = next.get(id);
+        next.delete(id);
+        if (id === start) break;
+        d += `L${point(id)}`;
+        id = after;
+      }
+      d += "Z";
+    }
+    return d;
   };
 
   // The water starts from rest and catches up with the ball, so it never pops in fully
@@ -184,11 +252,10 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
   // Draw the bubble at pull progress p (0..1). s = +1 left wall, -1 right wall.
   // snap (0..1): how far the neck has pinched off after crossing the threshold.
   const render = (p, s, by, snap = 0) => {
-    const { box, strip, bump, ball, icon } = ui;
+    const { box, shape, icon } = ui;
     const boxLeft = s > 0 ? -WALL : window.innerWidth - BOX_W + WALL;
     const wallX = s > 0 ? WALL : BOX_W - WALL;
     box.style.translate = `${boxLeft}px ${by - BOX_H / 2}px`;
-    strip.style.left = s > 0 ? "0" : `${BOX_W - WALL + 8}px`;
     const cx = -R + (2 * R + GAP) * p;
     // The neck stays attached until the threshold, so the snap is what sets off the bounce
     const [aMax, aEnd] = MOUND_W;
@@ -197,17 +264,29 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
     const attached = wv < 0.6 ? aMax * (wv / 0.6) : aMax + (aEnd - aMax) * ((wv - 0.6) / 0.4);
     const a = w == null ? 0 : attached * (1 - snap);
     const b = MOUND_H[0] - (MOUND_H[0] - MOUND_H[1]) * clamp01(wv / 0.6);
-    bump.style.width = `${2 * a}px`;
-    bump.style.height = `${2 * b}px`;
-    bump.style.translate = `${wallX - a}px ${BOX_H / 2 - b}px`;
-    ball.style.translate = `${wallX + s * cx - R}px ${BOX_H / 2 - R}px`;
-    // The neck holds the ball back, so it stretches near the threshold
-    const t = snap > 0 || bub?.armedAt != null ? 0 : clamp01((p - 0.55) / 0.45) ** 2;
-    const sx = 1 + (STRETCH[0] - 1) * t;
-    const sy = 1 + (STRETCH[1] - 1) * t;
-    ball.style.scale = `${sx} ${sy}`;
-    // Icon lives outside the filter so it stays crisp. Positions use the `translate`
-    // property so the bounce's scale animations apply around each element's center.
+    // The neck holds the ball back, so it stretches near the threshold; once the neck
+    // snaps, the ball wobbles back to round
+    const since = bub?.armedAt == null ? null : performance.now() - bub.armedAt;
+    const sx =
+      since == null
+        ? 1 + (STRETCH - 1) * clamp01((p - 0.55) / 0.45) ** 2
+        : since < BOUNCE_MS
+          ? 1 +
+            (STRETCH - 1) *
+              Math.exp(-since / BOUNCE[0]) *
+              Math.cos((2 * Math.PI * since) / BOUNCE[1])
+          : 1;
+    const sy = 1 / sx;
+    // In the wall's frame: x points away from the wall. The wall itself starts 8px behind
+    // the screen edge, so the mound flares into it like a bell curve.
+    const rx = R * sx;
+    const ry = R * sy;
+    const field = (x, y) => melt(melt(x + 8, ellipse(x, y, a, b)), ellipse(x - cx, y, rx, ry));
+    const reach = Math.max(a, cx + rx) + MELT;
+    const tall = Math.max(b, ry) + MELT;
+    shape.setAttribute("d", outline(field, -3 * GRID, reach, -tall, tall));
+    shape.setAttribute("transform", `translate(${wallX} ${BOX_H / 2}) scale(${s} 1)`);
+    // Positions use the `translate` property so the fade's animations don't clash
     const iconScale = 0.5 + 0.5 * clamp01((p - 0.3) / 0.6);
     icon.style.opacity = String(clamp01((p - 0.35) / 0.4) * (bub?.opt.opacity ?? 1));
     icon.style.translate = `${boxLeft + wallX + s * cx - 13}px ${by - 13}px`;
@@ -215,43 +294,17 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
   };
 
   const applyOptions = (opt) => {
-    ui.box.style.filter = `url(#asn-goo) drop-shadow(0 2px 5px ${opt.shadow_color})`;
     ui.box.style.opacity = String(opt.opacity);
   };
 
   const setArmed = (armed) => {
     const c = armed ? bub.opt.bubble_active_color : bub.opt.bubble_color;
-    ui.bump.style.background = c;
-    ui.strip.style.background = c;
-    ui.ball.style.background = c;
+    ui.shape.style.fill = c;
     ui.icon.style.color = armed ? bub.opt.icon_active_color : bub.opt.icon_color;
   };
 
-  // Starts from the stretched shape the pull left, so the snap looks continuous
-  const bounce = () => {
-    const [x, y] = STRETCH;
-    ui.ball.animate(
-      [
-        { scale: `${x} ${y}` },
-        { scale: "0.86 1.14", offset: 0.35 },
-        { scale: "1.06 0.95", offset: 0.65 },
-        { scale: "1 1" },
-      ],
-      { duration: 400, easing: "ease-out" },
-    );
-    ui.icon.animate(
-      [
-        { scale: `${1 + (x - 1) / 2} ${1 + (y - 1) / 2}` },
-        { scale: "0.9 1.1", offset: 0.4 },
-        { scale: "1.04 0.97", offset: 0.7 },
-        { scale: "1 1" },
-      ],
-      { duration: BOUNCE_MS, easing: "ease-out" },
-    );
-  };
-
   const stopAnimations = () =>
-    [ui.ball, ui.box, ui.icon].forEach((el) => el.getAnimations().forEach((a) => a.cancel()));
+    [ui.box, ui.icon].forEach((el) => el.getAnimations().forEach((a) => a.cancel()));
 
   const hide = () => {
     ui.box.style.display = "none";
@@ -273,12 +326,12 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
     return 1 - (1 - k) * (1 - k);
   };
 
-  // Keep the pinch-off animating while the finger holds still and after release
+  // Keep the pinch-off and wobble animating while the finger holds still and after release
   const snapTick = (me) => {
     if (bub !== me || me.armedAt == null) return; // newer bubble, or re-attached
-    const snap = snapNow();
-    render(me.p, me.s, me.by, snap);
-    if (snap < 1) requestAnimationFrame(() => snapTick(me));
+    render(me.p, me.s, me.by, snapNow());
+    if (performance.now() - me.armedAt < BOUNCE_MS) requestAnimationFrame(() => snapTick(me));
+    else render(me.p, me.s, me.by, 1); // round again
   };
 
   // HA caches views, so an old view comes back later. Leaves HA's own inline styles alone.
@@ -543,7 +596,6 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
         bub.noWall = bub.armedAt - bub.shownAt < FLICK_MS;
         const me = bub;
         requestAnimationFrame(() => snapTick(me));
-        bounce();
       }
     }
     if (!armed) {
@@ -556,28 +608,6 @@ const VERSION = "0.0.0-dev"; // replaced by the release workflow
 
   const onEnd = (e) => once(e) && release();
   const onCancel = (e) => once(e) && release(true);
-
-  // Phones set up the goo filter's GPU work on its first paint, which made the first swipe
-  // after launch stutter. Paint the bubble once, invisibly, while the page is idle.
-  const warmUp = () => {
-    if (ui || reducedMotion?.matches) return;
-    ui = makeUi();
-    bub = { opt: DEFAULTS, armedAt: null, shownAt: -Infinity };
-    applyOptions(DEFAULTS);
-    setArmed(false);
-    ui.box.style.display = ui.icon.style.display = "";
-    render(0.6, -1, window.innerHeight / 2);
-    ui.box.style.opacity = ui.icon.style.opacity = "0.01"; // 0 would skip painting
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => {
-        if (g) return; // a swipe already took over the bubble
-        bub = null;
-        hide();
-      }),
-    );
-  };
-  if (window.requestIdleCallback) requestIdleCallback(warmUp, { timeout: 3000 });
-  else setTimeout(warmUp, 1000);
 
   window.addEventListener("touchstart", onStart, { passive: true, capture: true });
   window.addEventListener("touchmove", onMove, { passive: false, capture: true });

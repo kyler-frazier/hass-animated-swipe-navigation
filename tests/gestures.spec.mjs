@@ -13,11 +13,6 @@ import {
 const Y = 600;
 
 test.describe("bubble and gestures", () => {
-  test("the bubble is prepared before the first swipe", async ({ page }) => {
-    await openView(page, "/test-default/one");
-    await expect.poll(() => bubbleState(page)).toBe("hidden");
-  });
-
   test("bubble shows the destination icon while dragging, then goes away", async ({ page }) => {
     await openView(page, "/test-default/one");
     const ts = await touchscreen(page);
@@ -75,5 +70,19 @@ test.describe("bubble and gestures", () => {
 
     await ts.swipe([200, 800], [200, 300]);
     await expect.poll(() => scrollTop(page)).toBeGreaterThan(100);
+  });
+  test("the bubble is drawn without blur filters", async ({ page }) => {
+    await openView(page, "/test-default/one");
+    const ts = await touchscreen(page);
+    await ts.down([330, Y]);
+    await ts.drag([330, Y], [330 - FAR, Y]);
+    const filters = await page.evaluate(() => {
+      const box = document.querySelector(".asn-bubble");
+      return [box, ...box.querySelectorAll("*")]
+        .filter((el) => el.localName === "filter" || getComputedStyle(el).filter !== "none")
+        .map((el) => el.localName);
+    });
+    expect(filters).toEqual([]);
+    await ts.up();
   });
 });

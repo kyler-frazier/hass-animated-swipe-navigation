@@ -79,7 +79,6 @@ All options are optional.
 | `bubble_active_color` | `#383b42`                  | Bubble color once letting go will switch views. Any CSS color, e.g. `var(--primary-color)`. |
 | `icon_color`          | `#b4b7bf`                  | Icon color while dragging.                                                                  |
 | `icon_active_color`   | `rgba(255, 255, 255, .85)` | Icon color once letting go will switch views.                                               |
-| `shadow_color`        | `rgba(0, 0, 0, .35)`       | Color of the shadow under the bubble.                                                       |
 | `view_fade`           | `0.2`                      | How much the current view fades at full pull, from 0 (none) to 1.                           |
 
 Example:

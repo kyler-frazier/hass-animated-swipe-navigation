@@ -6,7 +6,7 @@ const Y = 600;
 const look = (page) =>
   page.evaluate(() => {
     const box = document.querySelector(".asn-bubble");
-    const ball = box.children[2];
+    const ball = box.querySelector("path");
     const icon = document.querySelector(".asn-icon");
     const view = document
       .querySelector("home-assistant")
@@ -16,8 +16,7 @@ const look = (page) =>
       .shadowRoot.querySelector("#view hui-view");
     return {
       opacity: getComputedStyle(box).opacity,
-      shadow: box.style.filter,
-      bubble: getComputedStyle(ball).backgroundColor,
+      bubble: getComputedStyle(ball).fill,
       icon: getComputedStyle(icon).color,
       viewOpacity: getComputedStyle(view).opacity,
     };
@@ -31,7 +30,6 @@ test("every color and opacity option is applied", async ({ page }) => {
   await page.waitForTimeout(300); // let color transitions finish
   const idle = await look(page);
   expect(idle.opacity).toBe("0.5");
-  expect(idle.shadow).toContain("rgb(130, 140, 150)");
   expect(idle.bubble).toBe("rgb(10, 20, 30)");
   expect(idle.icon).toBe("rgb(70, 80, 90)");
   expect(Number(idle.viewOpacity)).toBeCloseTo(0.75, 1); // half pull, view_fade 0.5

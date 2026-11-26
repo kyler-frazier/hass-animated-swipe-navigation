@@ -10,6 +10,14 @@ All notable changes to this project are documented here. The format is based on
 
 - Letting go now slides the old view out and the new one in, with the header staying put. Taps on
   the page wait until the slide is done; a new swipe doesn't.
+- The bubble's goo is now drawn as one shape instead of with blur filters, so the first swipe
+  after the app loads no longer lags.
+
+### Removed
+
+- The bubble is no longer built ahead of the first swipe; drawing it without blur made that
+  warm-up unnecessary.
+- The shadow under the bubble and its `shadow_color` option (it was invisible on dark themes).
 
 ## [0.2.0] - 2026-10-15
 
